@@ -9,19 +9,13 @@
 #include <sys/wait.h>
 #include "gettext.h"
 
-
-#define COMMAND_BUF_SIZE 256
-#define MAX_NUM_ARGS 5
-#define MAX_SIZE_ARGS 6
+#define COMMAND_BUF_SIZE 512
+#define MAX_NUM_ARGS 100
 
 int parsing_command(
         char *str,
         char **const args,
         size_t num_args);
-
-int get_command(
-        char *str,
-        size_t str_size);
 
 int exec_prog(
         char **args,
@@ -42,7 +36,7 @@ int main()
 
     for(;;)
     {
-        printf("\ncommand> ");
+        printf("command> ");
         ret = get_text(
                 command_buf,
                 sizeof(command_buf));
@@ -61,19 +55,14 @@ int main()
                     args,
                     sizeof(args) / sizeof(args[0]));
 
-            if (0 == strncasecmp(args[0], "exit", 4))
+            if (0 == strncasecmp(args[0], "exit", 5))
             {
-                puts("Exiting the commandshell.");
+                puts("Exiting the commandshell");
                 break;
             }
 
             ret = exec_prog(args, &child);
-            printf("ret = %d\n", ret);
-            if (true == child)
-            {
-                break;
-            }
-            else if (0 != ret)
+            if (true == child || 0 != ret)
             {
                 break;
             }
@@ -82,17 +71,6 @@ int main()
 
     return ret;
 }
-
-
-int get_command(
-        char *const str,
-        size_t const str_size)
-{
-    int ret = 0;
-
-    return ret;
-}
-
 
 
 int parsing_command(
@@ -114,14 +92,11 @@ int parsing_command(
     }
 
     args[i] = pstr;
-    printf("args[%d] = %p\n", i, args[i]);
-
     i++;
 
     while (NULL != (pstr = strtok(NULL, " ")) && i < (num_args - 1))
     {
         args[i] = pstr;
-        printf("args[%d] = %p\n", i, args[i]);
         i++;
     }
 
@@ -132,7 +107,6 @@ int parsing_command(
     }
 
     args[i] = NULL;
-    printf("args[%d] = %p\n", i, args[i]);
 
  finally:
 
@@ -145,9 +119,8 @@ int exec_prog(
         bool *const child)
 {
     int ret = 0;
-    int errsv = 0;
 
-    pid_t pid, ret_pid;
+    pid_t pid;
     int wstatus = 0;
 
     errno = 0;
@@ -156,51 +129,45 @@ int exec_prog(
         case -1: // Error in fork()
         {
             *child = false;
-            errsv = errno;
+
             perror("Error in fork()");
-            printf("errno = %d\n", errsv);
-            ret = EXIT_FAILURE;
-            goto finally;
+            ret = -1;
+            break;
         }
         case 0: // Child process
         {
             *child = true;
-            printf("Child %d, parent pid = %d\n", getpid(), getppid());
             
             errno = 0;
-            if (-1 == execvp(args[0], args))
+            if (-1 == execvp(args[0], args) && 0 != errno)
             {
                 ret = errno;
                 perror("Error in command");
+            }
+            else
+            {
+                ret = -1;
             }
             break;
         }
         default: // Parent process
         {
             *child = false;
-            printf("Parent %d, child pid = %d\n", getpid(), pid);
-            ret_pid = waitpid(pid, &wstatus, 0);
 
-            printf("ret_pid = %d\n", ret_pid);
-
-            if (-1 == ret_pid)
+            if (-1 == waitpid(pid, &wstatus, 0))
             {
-                errsv = errno;
                 perror("Error in wait(...)");
-                printf("errno = %d\n", errsv);
-                ret = EXIT_FAILURE;
+                ret = -1;
                 goto finally;
             }
-            
+
             if (WIFEXITED(wstatus))
             {
-                printf("Child pid = %d exited, WEXITSTATUS(wstatus) = %d\n",
-                        pid,
-                        WEXITSTATUS(wstatus));
+                printf("Shell returned status: %d\n", WEXITSTATUS(wstatus));
             }
             else
             {
-                printf("Child pid = %d exited, not WEXITSTATUS\n", pid);
+                printf("Shell aborted/interrupded with status: %d\n", wstatus);
             }
 
             break;
