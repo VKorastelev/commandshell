@@ -79,7 +79,7 @@ int parsing_command(
         size_t const num_args)
 {
     int ret = 0;
-    int i = 0;
+    size_t i = 0;
     char *pstr = NULL;
 
     pstr = strtok(str, " ");
